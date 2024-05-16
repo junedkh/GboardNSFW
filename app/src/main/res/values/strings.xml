@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Gboard NSFW</string>
+    <string name="app_description">Enable NSFW gifs for Gboard\nWork on v13.5.xxx</string>
+</resources>

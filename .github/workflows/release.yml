@@ -1,0 +1,60 @@
+name: Release CI
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: "Mark as Pre-release"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Build Apk
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease getVersion
+          echo "version=$(cat app/build/version.txt)" >> $GITHUB_ENV
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Sign APK
+        id: sign_app
+        uses: kevin-david/zipalign-sign-android-release@main
+        with:
+          releaseDirectory: app/build/outputs/apk/release/
+          signingKeyBase64: ${{ secrets.KEY_STORE }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.ALIAS_KEY_PASSWORD }}
+          zipAlign: false
+
+      - name: Process file
+        run: |
+          cd app/build/outputs/apk/release/
+          shopt -s extglob
+          rm !(*-signed*)
+          mv app-release-unsigned-signed.apk nsfw-gboard-v${{ env.version }}.apk
+
+      - uses: ncipollo/release-action@v1.14.0
+        with:
+          prerelease: ${{ inputs.prerelease }}
+          tag: v${{ env.version }}
+          name: "v${{ env.version }}"
+          artifacts: app/build/outputs/apk/release/nsfw-gboard-v${{ env.version }}.apk
+          token: ${{secrets.TOKEN}}
+          replacesArtifacts: true
+          allowUpdates: true
